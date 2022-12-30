@@ -58,7 +58,9 @@ int main(int argc, char **argv)
             cout << "头部信息接收出错" << endl;
             return 1;
         }
-        cout<<"width="<<msg.width<<" "<<"height="<<msg.height<<endl;
+        //cout<<"width="<<msg.width<<" "<<"height="<<msg.height<<endl;
+        rec = 0;
+        len = 0;
         while (rec != msg.frame_size)
         {
             len = read(client, buffer, msg.frame_size - rec);
@@ -73,13 +75,13 @@ int main(int argc, char **argv)
             cout<<"发送反馈错误"<<endl;
             return 1;
         }
-        cout<<"rec="<<rec<<" frame_size="<<msg.frame_size<<endl;
-        rec = 0;
-        len = 0;
+        //cout<<"rec="<<rec<<" frame_size="<<msg.frame_size<<endl;
         cv::_InputArray pic_arr(buffer,msg.frame_size);
         m_mat=cv::imdecode(pic_arr,CV_LOAD_IMAGE_COLOR);
-        cv::imshow("show", m_mat);
-        cv::waitKey(200);
+        if(!m_mat.empty()){
+            cv::imshow("show", m_mat);
+        }
+        cv::waitKey(1);
     }
     return 0;
 }

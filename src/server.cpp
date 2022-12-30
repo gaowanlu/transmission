@@ -68,30 +68,33 @@ int main(int argc, char **argv)
         capture >> m_mat;
         if (m_mat.empty())
         {
-            break;
+            cout<<"读帧失败"<<endl;
+            continue;
         }
         vector<uchar> data_encode;
-        cv::imencode(".jpg",m_mat,data_encode);
+        cv::imencode(".jpg", m_mat, data_encode);
         msg.frame_size = data_encode.size();
         write(client, &msg, sizeof(msg_header));
-        {//发送vector内的内容
-            int sended=0;
-            uchar buffer[512];
-            int buffer_len=0;
-            while(sended!=data_encode.size()){
-                for(;sended<data_encode.size();){
-                    buffer[buffer_len++]=data_encode[sended];
-                    sended++;
-                    if(buffer_len==512){
+        { // 发送vector内的内容
+            int sended = 0;
+            uchar buffer[2048];
+            int buffer_len = 0;
+            while (sended < data_encode.size())
+            {
+                for (; sended < data_encode.size();)
+                {
+                    buffer[buffer_len++] = data_encode[sended++];
+                    if (buffer_len == 2048)
+                    {
                         break;
                     }
                 }
-                write(client,buffer,buffer_len);
-                buffer_len=0;
+                write(client, buffer, buffer_len);
+                buffer_len = 0;
             }
         }
-        cout << "length=" << msg.frame_size << endl;
-        // 等待反馈
+        // cout << "length=" << msg.frame_size << endl;
+        //  等待反馈
         int len = 0;
         int temp = 0;
         while (len != sizeof(msg_header))
