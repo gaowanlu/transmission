@@ -44,22 +44,25 @@ int main(int argc, char **argv)
         cout << "头部信息接收出错" << endl;
         return 1;
     }
-    cout << "width="<<msg.width << " height=" << msg.height << " size=" << msg.frame_size <<" channel="<<msg.channel<< endl;
-    
-    Decode* decode = nullptr;
-    if(msg.channel == Decode::Channel::ONE){
-    	decode = new Decode(msg.width,msg.height,Decode::Channel::ONE);
-    }else{
-    	decode = new Decode(msg.width,msg.height,Decode::Channel::THREE);
+    cout << "width=" << msg.width << " height=" << msg.height << " size=" << msg.frame_size << " channel=" << msg.channel << endl;
+
+    Decode *decode = nullptr;
+    if (msg.channel == Decode::Channel::ONE)
+    {
+        decode = new Decode(msg.width, msg.height, Decode::Channel::ONE);
     }
-  
+    else
+    {
+        decode = new Decode(msg.width, msg.height, Decode::Channel::THREE);
+    }
+
     uchar *buffer = decode->getBuffer();
     int rec = 0;
     len = 0;
     cv::namedWindow("show");
     cv::Mat m_mat1 = decode->newMat();
     cv::Mat m_mat2 = decode->newMat();
-    int now_mat_flag=1;
+    int now_mat_flag = 1;
     while (1)
     {
         len = read(client, &msg, sizeof(msg));
@@ -68,7 +71,7 @@ int main(int argc, char **argv)
             cout << "头部信息接收出错" << endl;
             return 1;
         }
-        //cout<<"width="<<msg.width<<" "<<"height="<<msg.height<<endl;
+        // cout<<"width="<<msg.width<<" "<<"height="<<msg.height<<endl;
         rec = 0;
         len = 0;
         while (rec != msg.frame_size)
@@ -80,21 +83,25 @@ int main(int argc, char **argv)
             }
             rec += len;
         }
-        len=write(client,&msg,sizeof(msg_header));//反馈
-        if(len!=sizeof(msg_header)){
-            cout<<"发送反馈错误"<<endl;
+        len = write(client, &msg, sizeof(msg_header)); // 反馈
+        if (len != sizeof(msg_header))
+        {
+            cout << "发送反馈错误" << endl;
             return 1;
         }
-        //cout<<"rec="<<rec<<" frame_size="<<msg.frame_size<<endl;
-        if(now_mat_flag==1){
-		decode->toMat(m_mat1);
-		now_mat_flag=2;
-		cv::imshow("show",m_mat2);
-	}else{
-		decode->toMat(m_mat2);
-		now_mat_flag=1;
-		cv::imshow("show",m_mat1);
-	}
+        // cout<<"rec="<<rec<<" frame_size="<<msg.frame_size<<endl;
+        if (now_mat_flag == 1)
+        {
+            decode->toMat(m_mat1);
+            now_mat_flag = 2;
+            cv::imshow("show", m_mat2);
+        }
+        else
+        {
+            decode->toMat(m_mat2);
+            now_mat_flag = 1;
+            cv::imshow("show", m_mat1);
+        }
         cv::waitKey(80);
     }
     return 0;

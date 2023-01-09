@@ -56,54 +56,58 @@ int main(int argc, char **argv)
     msg.width = m_mat.cols;
     msg.height = m_mat.rows;
 #if COLOR
-    Encode encode(msg.width,msg.height,Encode::THREE);
+    Encode encode(msg.width, msg.height, Encode::THREE);
     msg.channel = Encode::Channel::THREE;
 #else
-    Encode encode(msg.width,msg.height,Encode::ONE);
-    cvtColor(m_mat,m_mat,cv::COLOR_BGR2GRAY);
+    Encode encode(msg.width, msg.height, Encode::ONE);
+    cvtColor(m_mat, m_mat, cv::COLOR_BGR2GRAY);
     msg.channel = Encode::Channel::ONE;
 #endif
     msg.frame_size = encode.size();
     // 循环发送图像
     while (1)
     {
-	//客户端连接
-	if(client == -1){
-		client = accept(server,(struct sockaddr*)&client_address,&client_len);
-		if(client<0){
-			cout<<"accept error: "<<errno<<endl;
-			return -1;
-		}
-		//发送协议头
-		if(sizeof(msg_header) != write(client,&msg,sizeof(msg))){
-			cout<<"头部信息发送出错"<<endl;
-			continue;
-		}
-	}
-	//读帧与编码
+        // 客户端连接
+        if (client == -1)
+        {
+            client = accept(server, (struct sockaddr *)&client_address, &client_len);
+            if (client < 0)
+            {
+                cout << "accept error: " << errno << endl;
+                return -1;
+            }
+            // 发送协议头
+            if (sizeof(msg_header) != write(client, &msg, sizeof(msg)))
+            {
+                cout << "头部信息发送出错" << endl;
+                continue;
+            }
+        }
+        // 读帧与编码
         capture >> m_mat;
         if (m_mat.empty())
         {
-            cout<<"读帧失败"<<endl;
+            cout << "读帧失败" << endl;
             continue;
         }
 #if COLOR
 #else
-	cvtColor(m_mat,m_mat,cv::COLOR_BGR2GRAY);	
+        cvtColor(m_mat, m_mat, cv::COLOR_BGR2GRAY);
 #endif
-	encode.matTo(m_mat);
-	cv::imshow("show1",m_mat);
-	cv::waitKey(1);
-	//发送头部
+        encode.matTo(m_mat);
+        cv::imshow("show1", m_mat);
+        cv::waitKey(1);
+        // 发送头部
         ssize_t count = write(client, &msg, sizeof(msg_header));
-	if(count!=sizeof(msg_header)){
-	    close(client);
-	    client = -1;
-	    continue;
-	}
+        if (count != sizeof(msg_header))
+        {
+            close(client);
+            client = -1;
+            continue;
+        }
         { // 发送编码内容
-            int buffer_len = 0,sended = 0;
-	    uchar buffer[2048];
+            int buffer_len = 0, sended = 0;
+            uchar buffer[2048];
             while (sended < encode.size())
             {
                 for (; sended < encode.size();)
@@ -115,11 +119,12 @@ int main(int argc, char **argv)
                     }
                 }
                 ssize_t count = write(client, buffer, buffer_len);
-		if(!count){
-		    close(client);
-		    client = -1;
-	            continue;
-		}
+                if (!count)
+                {
+                    close(client);
+                    client = -1;
+                    continue;
+                }
                 buffer_len = 0;
             }
         }
@@ -132,8 +137,8 @@ int main(int argc, char **argv)
             if (temp <= 0)
             {
                 close(client);
-		client = -1;
-		break;
+                client = -1;
+                break;
             }
             len += temp;
         }
