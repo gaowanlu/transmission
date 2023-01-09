@@ -1,4 +1,3 @@
-// g++ `pkg-config opencv4 --cflags` client.cpp -o client `pkg-config opencv4 --libs`
 #include <iostream>
 #include <sys/types.h>
 #include <string>
@@ -13,6 +12,7 @@
 #include <fcntl.h>
 #include <opencv2/imgcodecs/legacy/constants_c.h>
 #include "msg_header.h"
+#include "code.h"
 
 using namespace std;
 
@@ -29,14 +29,14 @@ int main(int argc, char **argv)
     memset(&server_address, 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
-    server_address.sin_port = htons(2023);
+    server_address.sin_port = htons(8888);
     if (0 != connect(client, (struct sockaddr *)&server_address, sizeof(server_address)))
     {
         cout << "连接失败" << endl;
         return 1;
     }
     cout << "连接成功" << endl;
-    // read 读取控制信息
+    // 获取协议头
     msg_header msg;
     int len = read(client, &msg, sizeof(msg));
     if (len != sizeof(msg_header))
@@ -44,12 +44,22 @@ int main(int argc, char **argv)
         cout << "头部信息接收出错" << endl;
         return 1;
     }
-    cout << msg.width << " " << msg.height << " " << msg.frame_size << endl;
-    uchar *buffer = new uchar[msg.frame_size];
+    cout << "width="<<msg.width << " height=" << msg.height << " size=" << msg.frame_size <<" channel="<<msg.channel<< endl;
+    
+    Decode* decode = nullptr;
+    if(msg.channel == Decode::Channel::ONE){
+    	decode = new Decode(msg.width,msg.height,Decode::Channel::ONE);
+    }else{
+    	decode = new Decode(msg.width,msg.height,Decode::Channel::THREE);
+    }
+  
+    uchar *buffer = decode->getBuffer();
     int rec = 0;
     len = 0;
     cv::namedWindow("show");
-    cv::Mat m_mat;
+    cv::Mat m_mat1 = decode->newMat();
+    cv::Mat m_mat2 = decode->newMat();
+    int now_mat_flag=1;
     while (1)
     {
         len = read(client, &msg, sizeof(msg));
@@ -76,12 +86,16 @@ int main(int argc, char **argv)
             return 1;
         }
         //cout<<"rec="<<rec<<" frame_size="<<msg.frame_size<<endl;
-        cv::_InputArray pic_arr(buffer,msg.frame_size);
-        m_mat=cv::imdecode(pic_arr,CV_LOAD_IMAGE_COLOR);
-        if(!m_mat.empty()){
-            cv::imshow("show", m_mat);
-        }
-        cv::waitKey(1);
+        if(now_mat_flag==1){
+		decode->toMat(m_mat1);
+		now_mat_flag=2;
+		cv::imshow("show",m_mat2);
+	}else{
+		decode->toMat(m_mat2);
+		now_mat_flag=1;
+		cv::imshow("show",m_mat1);
+	}
+        cv::waitKey(80);
     }
     return 0;
 }

@@ -1,4 +1,3 @@
-// g++ `pkg-config opencv4 --cflags` server.cpp -o server `pkg-config opencv4 --libs`
 #include <iostream>
 #include <stdlib.h>
 #include <unistd.h>
@@ -13,11 +12,15 @@
 #include <fcntl.h>
 #include <vector>
 #include "msg_header.h"
+#include "code.h"
+
+#define COLOR 0
 
 using namespace std;
 
 int main(int argc, char **argv)
 {
+    cv::namedWindow("show1");
     // 创建监听套接字
     int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     int client = -1;
@@ -31,13 +34,11 @@ int main(int argc, char **argv)
     memset(&server_address, 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = inet_addr("0.0.0.0");
-    server_address.sin_port = htons(2023); // 转网络字节序
+    server_address.sin_port = htons(8888); // 转网络字节序
     bind(server, (struct sockaddr *)&server_address, sizeof(server_address));
     listen(server, 20);
     cout << "正在监听" << endl;
     socklen_t client_len = sizeof(sockaddr_in);
-    client = accept(server, (struct sockaddr *)&client_address, &client_len);
-    cout << "接收端连接成功" << endl;
     // 打开相机
     cv::Mat m_mat;
     cv::VideoCapture capture(0);
@@ -51,49 +52,77 @@ int main(int argc, char **argv)
     {
         return 1;
     }
-
     msg_header msg;
     msg.width = m_mat.cols;
     msg.height = m_mat.rows;
-    msg.frame_size = msg.width * msg.height * 3;
-    int sended_len = write(client, &msg, sizeof(msg));
-    cout << "已发送头部信息长度 " << sended_len << endl;
-    if (sended_len != sizeof(msg_header))
-    {
-        cout << "头部信息发送出错" << endl;
-    }
+#if COLOR
+    Encode encode(msg.width,msg.height,Encode::THREE);
+    msg.channel = Encode::Channel::THREE;
+#else
+    Encode encode(msg.width,msg.height,Encode::ONE);
+    cvtColor(m_mat,m_mat,cv::COLOR_BGR2GRAY);
+    msg.channel = Encode::Channel::ONE;
+#endif
+    msg.frame_size = encode.size();
     // 循环发送图像
     while (1)
     {
+	//客户端连接
+	if(client == -1){
+		client = accept(server,(struct sockaddr*)&client_address,&client_len);
+		if(client<0){
+			cout<<"accept error: "<<errno<<endl;
+			return -1;
+		}
+		//发送协议头
+		if(sizeof(msg_header) != write(client,&msg,sizeof(msg))){
+			cout<<"头部信息发送出错"<<endl;
+			continue;
+		}
+	}
+	//读帧与编码
         capture >> m_mat;
         if (m_mat.empty())
         {
             cout<<"读帧失败"<<endl;
             continue;
         }
-        vector<uchar> data_encode;
-        cv::imencode(".jpg", m_mat, data_encode);
-        msg.frame_size = data_encode.size();
-        write(client, &msg, sizeof(msg_header));
-        { // 发送vector内的内容
-            int sended = 0;
-            uchar buffer[2048];
-            int buffer_len = 0;
-            while (sended < data_encode.size())
+#if COLOR
+#else
+	cvtColor(m_mat,m_mat,cv::COLOR_BGR2GRAY);	
+#endif
+	encode.matTo(m_mat);
+	cv::imshow("show1",m_mat);
+	cv::waitKey(1);
+	//发送头部
+        ssize_t count = write(client, &msg, sizeof(msg_header));
+	if(count!=sizeof(msg_header)){
+	    close(client);
+	    client = -1;
+	    continue;
+	}
+        { // 发送编码内容
+            int buffer_len = 0,sended = 0;
+	    uchar buffer[2048];
+            while (sended < encode.size())
             {
-                for (; sended < data_encode.size();)
+                for (; sended < encode.size();)
                 {
-                    buffer[buffer_len++] = data_encode[sended++];
+                    buffer[buffer_len++] = encode.getBuffer()[sended++];
                     if (buffer_len == 2048)
                     {
                         break;
                     }
                 }
-                write(client, buffer, buffer_len);
+                ssize_t count = write(client, buffer, buffer_len);
+		if(!count){
+		    close(client);
+		    client = -1;
+	            continue;
+		}
                 buffer_len = 0;
             }
         }
-        // cout << "length=" << msg.frame_size << endl;
         //  等待反馈
         int len = 0;
         int temp = 0;
@@ -102,8 +131,9 @@ int main(int argc, char **argv)
             temp = read(client, &msg, sizeof(msg_header) - len);
             if (temp <= 0)
             {
-                cout << "反馈错误" << endl;
-                return 1;
+                close(client);
+		client = -1;
+		break;
             }
             len += temp;
         }
