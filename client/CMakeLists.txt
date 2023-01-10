@@ -9,14 +9,16 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
+include_directories("${PROJECT_SOURCE}/net/")
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/)
 
 include_directories("${PROJECT_SOURCE}/")
 
 aux_source_directory(./ ROOT_SOURCE)
+aux_source_directory(./net/ NET_SOURCE)
 
-add_executable(${PROJECT_NAME} main.cpp ${ROOT_SOURCE})
+add_executable(${PROJECT_NAME} main.cpp ${ROOT_SOURCE} ${NET_SOURCE})
 
 target_link_libraries(${PROJECT_NAME} pthread ${OpenCV_LIBS})
 

@@ -6,13 +6,13 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <opencv2/opencv.hpp>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <vector>
 #include "msg_header.h"
 #include "code.h"
+#include "utils.h"
 
 #define COLOR 0
 
@@ -20,7 +20,7 @@ using namespace std;
 
 int main(int argc, char **argv)
 {
-    cv::namedWindow("show1");
+    Utils::newWindow("show");
     // 创建监听套接字
     int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     int client = -1;
