@@ -1,44 +1,24 @@
 #include <iostream>
 #include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include <cstring>
 #include <vector>
-#include "msg_header.h"
-#include "code.h"
-#include "utils.h"
+#include <memory>
+#include "msg/msg_header.h"
+#include "code/code.h"
+#include "utils/utils.h"
+#include "net/socket.h"
 
-#define COLOR 0
+#define COLOR 1
 
 using namespace std;
 
 int main(int argc, char **argv)
 {
-    Utils::newWindow("show");
+    Utils::newWindow("server");
     // 创建监听套接字
-    int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    int client = -1;
-    if (server <= 0)
-    {
-        cout << "监听套接字创建失败" << endl;
-        return 1;
-    }
-    struct sockaddr_in server_address;
-    struct sockaddr_in client_address;
-    memset(&server_address, 0, sizeof(server_address));
-    server_address.sin_family = AF_INET;
-    server_address.sin_addr.s_addr = inet_addr("0.0.0.0");
-    server_address.sin_port = htons(8888); // 转网络字节序
-    bind(server, (struct sockaddr *)&server_address, sizeof(server_address));
-    listen(server, 20);
-    cout << "正在监听" << endl;
-    socklen_t client_len = sizeof(sockaddr_in);
+    shared_ptr<Socket> server=make_shared<ServerSocket>();
+    server->bind("0.0.0.0",8888);
+    server->listen(20);
     // 打开相机
     cv::Mat m_mat;
     cv::VideoCapture capture(0);
@@ -64,20 +44,16 @@ int main(int argc, char **argv)
     msg.channel = Encode::Channel::ONE;
 #endif
     msg.frame_size = encode.size();
+    shared_ptr<Socket> client=nullptr;
     // 循环发送图像
     while (1)
     {
         // 客户端连接
-        if (client == -1)
+        if (client == nullptr)
         {
-            client = accept(server, (struct sockaddr *)&client_address, &client_len);
-            if (client < 0)
-            {
-                cout << "accept error: " << errno << endl;
-                return -1;
-            }
+            client = server->accept();
             // 发送协议头
-            if (sizeof(msg_header) != write(client, &msg, sizeof(msg)))
+            if (sizeof(msg_header) != client->write(&msg, sizeof(msg)))
             {
                 cout << "头部信息发送出错" << endl;
                 continue;
@@ -95,14 +71,14 @@ int main(int argc, char **argv)
         cvtColor(m_mat, m_mat, cv::COLOR_BGR2GRAY);
 #endif
         encode.matTo(m_mat);
-        cv::imshow("show1", m_mat);
+        cv::imshow("server", m_mat);
         cv::waitKey(1);
         // 发送头部
-        ssize_t count = write(client, &msg, sizeof(msg_header));
+        ssize_t count = client->write(&msg, sizeof(msg_header));
         if (count != sizeof(msg_header))
         {
-            close(client);
-            client = -1;
+            client->close();
+            client=nullptr;
             continue;
         }
         { // 发送编码内容
@@ -118,11 +94,11 @@ int main(int argc, char **argv)
                         break;
                     }
                 }
-                ssize_t count = write(client, buffer, buffer_len);
+                ssize_t count = client->write(buffer, buffer_len);
                 if (!count)
                 {
-                    close(client);
-                    client = -1;
+                    client->close();
+                    client = nullptr;
                     continue;
                 }
                 buffer_len = 0;
@@ -133,11 +109,11 @@ int main(int argc, char **argv)
         int temp = 0;
         while (len != sizeof(msg_header))
         {
-            temp = read(client, &msg, sizeof(msg_header) - len);
+            temp = client->read(&msg, sizeof(msg_header) - len);
             if (temp <= 0)
             {
-                close(client);
-                client = -1;
+                client->close();
+                client = nullptr;
                 break;
             }
             len += temp;

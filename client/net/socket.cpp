@@ -1,6 +1,4 @@
 #include "socket.h"
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <cstring>
 
 Socket::Socket()
@@ -12,7 +10,7 @@ Socket::~Socket()
 {
     if (fd != -1)
     {
-        close(fd);
+        ::close(fd);
         fd = -1;
     }
 }
@@ -32,7 +30,7 @@ void Socket::close()
 {
     if (fd != -1)
     {
-        close(fd);
+        ::close(fd);
         fd = -1;
     }
 }
@@ -41,7 +39,7 @@ ssize_t Socket::read(void *buf, size_t count)
 {
     if (fd < 0)
     {
-        throw new runtime_error("read error fd<0");
+        throw new std::runtime_error("read error fd<0");
     }
     return ::read(fd, buf, count);
 }
@@ -50,9 +48,9 @@ ssize_t Socket::write(const void *buf, size_t count)
 {
     if (fd < 0)
     {
-        throw new runtime_error("write error fd<0");
+        throw new std::runtime_error("write error fd<0");
     }
-    return ::write(buf, count);
+    return ::write(fd,buf, count);
 }
 
 ClientSocket::ClientSocket()
@@ -60,7 +58,7 @@ ClientSocket::ClientSocket()
     int client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (client < 0)
     {
-        throw new runtime_error("套接字创建失败");
+        throw new std::runtime_error("套接字创建失败");
     }
     fd = client;
 }
@@ -69,7 +67,7 @@ ClientSocket::~ClientSocket()
 {
     if (fd != -1)
     {
-        close(fd);
+        ::close(fd);
         fd = -1;
     }
 }
@@ -96,9 +94,9 @@ int ClientSocket::connect(const std::string &ip, int port)
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = inet_addr(ip.c_str());
     server_address.sin_port = htons(port);
-    if (0 != connect(client, (struct sockaddr *)&server_address, sizeof(server_address)))
+    if (0 != ::connect(fd, (struct sockaddr *)&server_address, sizeof(server_address)))
     {
-        throw new runtime_error("connect error");
+        throw new std::runtime_error("connect error");
     }
     return 0;
 }
@@ -108,7 +106,7 @@ ServerSocket::ServerSocket()
     fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (fd < 0)
     {
-        throw new runtime_error("套接字创建失败");
+        throw new std::runtime_error("套接字创建失败");
     }
 }
 
@@ -116,7 +114,7 @@ ServerSocket::~ServerSocket()
 {
     if (fd != -1)
     {
-        close(fd);
+        ::close(fd);
         fd = -1;
     }
 }
@@ -128,19 +126,19 @@ int ServerSocket::bind(const std::string &ip, int port)
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = inet_addr(ip.c_str());
     server_address.sin_port = htons(port); // 转网络字节序
-    return bind(fd, (struct sockaddr *)&server_address, sizeof(server_address));
+    return ::bind(fd, (struct sockaddr *)&server_address, sizeof(server_address));
 }
 
 int ServerSocket::listen(int queueSize)
 {
-    return listen(fd, queueSize);
+    return ::listen(fd, queueSize);
 }
 
 std::shared_ptr<Socket> ServerSocket::accept()
 {
     struct sockaddr_in client_address;
     socklen_t client_len = sizeof(sockaddr_in);
-    int clientFd = accept(server, (struct sockaddr *)&client_address, &client_len);
+    int clientFd = ::accept(fd, (struct sockaddr *)&client_address, &client_len);
     std::shared_ptr<Socket> client = std::make_shared<ClientSocket>();
     client->setFd(clientFd);
     return client;

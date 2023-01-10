@@ -2,18 +2,23 @@
 #include <string>
 #include <memory>
 #include <unistd.h>
+#include <stdexcept>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
 
 class Socket
 {
 public:
     Socket();
     virtual ~Socket();
-    virtual int bind(const std::string &ip, int port);
-    virtual int listen(int queueSize);
-    virtual std::shared_ptr<Socket> accept();
-    virtual int connect();
-    ssize_t read(int fd, void *buf, size_t count);
-    ssize_t write(int fd, const void *buf, size_t count);
+    virtual int bind(const std::string &ip, int port) = 0;
+    virtual int listen(int queueSize) = 0;
+    virtual std::shared_ptr<Socket> accept() = 0;
+    virtual int connect(const std::string &ip, int port) = 0;
+    ssize_t read(void *buf, size_t count);
+    ssize_t write(const void *buf, size_t count);
     int setFd(const int &fd);
     int getFd();
     void close();
